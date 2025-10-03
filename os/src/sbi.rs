@@ -1,15 +1,14 @@
-fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
-    let mut ret;
-    unsafe {
-        core::arch::asm!(
-            "ecall",
-        )
-    }
+pub fn console_putchar(c: usize) {
+    #[allow(deprecated)]
+    sbi_rt::legacy::console_putchar(c);
 }
 
-const SBI_SHUTDOWN: usize = 8;
-
-pub fn shutdown() -> ! {
-    sbi_call(SBI_SHUTDOWN, 0, 0, 0);
-    panic!("It should shutdown!");
+pub fn shutdown(failure: bool) -> ! {
+    use sbi_rt::{system_reset, NoReason, Shutdown, SystemFailure};
+    if !failure {
+        system_reset(Shutdown, NoReason);
+    } else {
+        system_reset(Shutdown, SystemFailure);
+    }
+    unreachable!()
 }
