@@ -8,7 +8,7 @@
     .section .text
     .globl __alltraps
     .globl __restore
-    # 将 __alltraps 的地址 4 字节对齐
+    # 4-byte align the address of __alltraps
     .align 2
 __alltraps:
     csrrw sp, sscratch, sp
