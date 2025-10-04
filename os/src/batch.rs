@@ -73,6 +73,8 @@ impl AppManager {
             crate::board::QEMU_EXIT_HANDLE.exit_success();
         }
         println!("[kernel] Loading app_{}", app_id);
+        // clear icache
+        core::arch::asm!("fence.i");
         // clear app area
         core::slice::from_raw_parts_mut(APP_BASE_ADDRESS as *mut u8, APP_SIZE_LIMIT).fill(0);
         let app_src = core::slice::from_raw_parts(
