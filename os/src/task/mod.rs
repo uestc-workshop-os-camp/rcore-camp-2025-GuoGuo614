@@ -20,6 +20,7 @@ use crate::sync::UPSafeCell;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+use crate::syscall::{SYSCALL_EXIT, SYSCALL_GET_TIME, SYSCALL_TRACE, SYSCALL_WRITE, SYSCALL_YIELD};
 
 pub use context::TaskContext;
 
@@ -51,10 +52,7 @@ lazy_static! {
     /// Global variable: TASK_MANAGER
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
-        let mut tasks = [TaskControlBlock {
-            task_cx: TaskContext::zero_init(),
-            task_status: TaskStatus::UnInit,
-        }; MAX_APP_NUM];
+        let mut tasks = [TaskControlBlock::new(); MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
@@ -135,6 +133,32 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn increase_syscall(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        match id {
+            SYSCALL_EXIT => inner.tasks[current].sys_exit_times += 1,
+            SYSCALL_GET_TIME => inner.tasks[current].sys_get_time_times += 1,
+            SYSCALL_TRACE => inner.tasks[current].sys_trace_times += 1,
+            SYSCALL_WRITE => inner.tasks[current].sys_write_times += 1,
+            SYSCALL_YIELD => inner.tasks[current].sys_yield_times += 1,
+            _ => panic!("Wrong syscall_id!")
+        }
+    }
+
+    fn trace_syscall(&self, id: usize) -> isize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        match id {
+            SYSCALL_EXIT => inner.tasks[current].sys_exit_times as isize,
+            SYSCALL_GET_TIME => inner.tasks[current].sys_get_time_times as isize,
+            SYSCALL_TRACE => inner.tasks[current].sys_trace_times as isize,
+            SYSCALL_WRITE => inner.tasks[current].sys_write_times as isize,
+            SYSCALL_YIELD => inner.tasks[current].sys_yield_times as isize,
+            _ => panic!("Wrong syscall_id!")
+        }
+    }
 }
 
 /// Run the first task in task list.
@@ -169,3 +193,13 @@ pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
 }
+
+/// Increase the counter for syscall
+pub fn increase_syscall(id: usize) {
+    TASK_MANAGER.increase_syscall(id);
+}
+
+/// Get the id(th) task's syscall times
+pub fn trace_syscall(id: usize) -> isize {
+    TASK_MANAGER.trace_syscall(id)
+} 
