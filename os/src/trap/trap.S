@@ -58,4 +58,5 @@ __restore:
     addi sp, sp, 34*8
     # now sp->kernel stack, sscratch->user stack
     csrrw sp, sscratch, sp
+# __temp:
     sret
