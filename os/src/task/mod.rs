@@ -134,29 +134,29 @@ impl TaskManager {
         }
     }
 
-    fn increase_syscall(&self, id: usize) {
+    fn increase_syscall(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        match id {
+        match syscall_id {
             SYSCALL_EXIT => inner.tasks[current].sys_exit_times += 1,
             SYSCALL_GET_TIME => inner.tasks[current].sys_get_time_times += 1,
             SYSCALL_TRACE => inner.tasks[current].sys_trace_times += 1,
             SYSCALL_WRITE => inner.tasks[current].sys_write_times += 1,
             SYSCALL_YIELD => inner.tasks[current].sys_yield_times += 1,
-            _ => panic!("Wrong syscall_id!")
+            _ => panic!("Unsupported syscall_id: {}", syscall_id)
         }
     }
 
-    fn trace_syscall(&self, id: usize) -> isize {
+    fn trace_syscall(&self, syscall_id: usize) -> isize {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        match id {
+        match syscall_id {
             SYSCALL_EXIT => inner.tasks[current].sys_exit_times as isize,
             SYSCALL_GET_TIME => inner.tasks[current].sys_get_time_times as isize,
             SYSCALL_TRACE => inner.tasks[current].sys_trace_times as isize,
             SYSCALL_WRITE => inner.tasks[current].sys_write_times as isize,
             SYSCALL_YIELD => inner.tasks[current].sys_yield_times as isize,
-            _ => panic!("Wrong syscall_id!")
+            _ => panic!("Unsupported syscall_id: {}", syscall_id)
         }
     }
 }
