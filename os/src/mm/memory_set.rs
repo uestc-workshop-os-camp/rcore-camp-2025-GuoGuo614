@@ -63,6 +63,37 @@ impl MemorySet {
             None,
         );
     }
+    /// Insert an Area, check if it has appeared
+    pub fn insert_framed_area_checked(
+        &mut self, 
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) -> Option<isize> {
+        for area in &self.areas {
+            if area.vpn_range.overlaps(&VPNRange::new(start_va.floor(), end_va.ceil())) {
+                return None;
+            }
+        }
+        self.insert_framed_area(start_va, end_va, permission);
+        Some(0)
+    }
+    /// Remove an Area, check if it appears
+    pub fn remove_framed_area_checked(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        let mut result = -1;
+        self.areas.retain_mut(|area| {
+            if area.vpn_range.get_start() == start_vpn && area.vpn_range.get_end() == end_vpn {
+                area.unmap(&mut self.page_table);
+                result = 0;
+                false
+            } else {
+                true
+            }
+        });
+        result
+    }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {

@@ -3,10 +3,12 @@ use crate::task::{
     change_program_brk, 
     exit_current_and_run_next, 
     suspend_current_and_run_next,
-    trace_syscall
+    trace_syscall,
+    current_user_token,
+    mmap,
+    munmap
 };
 
-use crate::task::current_user_token;
 use crate::mm::{translated_byte_buffer, translated_const_ptr, translated_mut_ptr};
 use crate::timer::{get_time_ms, get_time_us};
 
@@ -64,7 +66,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
         0 => {
             let ptr = translated_const_ptr(token, id as *const u8);
             match ptr {
-                None => -1,
+                None => -1_isize,
                 Some(ptr) => unsafe {
                     *ptr as isize
                 }
@@ -73,7 +75,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
         1 => {
             let ptr = translated_mut_ptr(token, id as *mut u8);
             match ptr {
-                None => -1,
+                None => -1_isize,
                 Some(ptr) => unsafe {
                     *ptr = data as u8;
                     0
@@ -86,15 +88,22 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
+    trace!("kernel: sys_mmap");
+    if prot & !0x7 != 0 || prot & 0x7 == 0 {
+        return -1;
+    }
+    if let Some(result) = mmap(start, len, prot) {
+        result
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
+pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    munmap(start, len)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

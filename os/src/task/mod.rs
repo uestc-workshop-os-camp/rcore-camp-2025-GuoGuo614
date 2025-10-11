@@ -21,6 +21,8 @@ use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+use crate::config::PAGE_SIZE;
+use crate::mm::MapPermission;
 
 pub use context::TaskContext;
 
@@ -168,6 +170,38 @@ impl TaskManager {
             None => 0
         }
     }
+
+    fn mmap(&self, start_va: usize, len: usize, prot: usize) -> Option<isize> {
+        if start_va % PAGE_SIZE != 0 {
+            return None;
+        }
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let page_count = (len + PAGE_SIZE - 1) / PAGE_SIZE;
+        let end_va = start_va + page_count * PAGE_SIZE;
+
+        let mut perm = MapPermission::empty() | MapPermission::U;
+        if prot & (1 << 0) != 0 { perm |= MapPermission::R; }
+        if prot & (1 << 1) != 0 { perm |= MapPermission::W; }
+        if prot & (1 << 2) != 0 { perm |= MapPermission::X; }
+
+        inner.tasks[current].memory_set.insert_framed_area_checked(start_va.into(), end_va.into(), perm)
+        // match inner.tasks[current].change_program_brk((page_count * PAGE_SIZE).try_into().unwrap()) {
+        //     None => None,
+        //     Some(_) => Some(0)
+        // }
+    }
+
+    fn munmap(&self, start_va: usize, len: usize) -> isize {
+        if start_va % PAGE_SIZE != 0 {
+            return -1
+        }
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let page_count = (len + PAGE_SIZE - 1) / PAGE_SIZE;
+        let end_va = start_va + page_count * PAGE_SIZE;
+        inner.tasks[current].memory_set.remove_framed_area_checked(start_va.into(), end_va.into())
+    }
 }
 
 /// Run the first task in task list.
@@ -226,4 +260,14 @@ pub fn increase_syscall(id: usize) {
 /// Get the id(th) task's syscall times
 pub fn trace_syscall(id: usize) -> isize {
     TASK_MANAGER.trace_syscall(id)
+}
+
+/// Alloc memory and map it
+pub fn mmap(start: usize, len: usize, prot: usize) -> Option<isize> {
+    TASK_MANAGER.mmap(start, len, prot)
+}
+
+/// Unmap a MapArea
+pub fn munmap(start: usize, len: usize) -> isize{
+    TASK_MANAGER.munmap(start, len)
 }
