@@ -179,3 +179,31 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     }
     v
 }
+
+/// Translate a const raw pointer
+pub fn translated_const_ptr(token: usize, ptr: *const u8) -> Option<*const u8> {
+    let page_table = PageTable::from_token(token);
+    let vpn = VirtAddr::from(ptr as usize).floor();
+    let ppn = page_table.translate(vpn);
+    match ppn {
+        None => None,
+        Some(pte) => {
+            let offset = VirtAddr::from(ptr as usize).page_offset();
+            Some(pte.ppn().get_bytes_array().as_ptr().wrapping_add(offset))
+        }
+    }
+}
+
+/// Translate a mut raw pointer
+pub fn translated_mut_ptr(token: usize, ptr: *mut u8) -> Option<*mut u8> {
+    let page_table = PageTable::from_token(token);
+    let vpn = VirtAddr::from(ptr as usize).floor();
+    let ppn = page_table.translate(vpn);
+    match ppn {
+        None => None,
+        Some(pte) => {
+            let offset = VirtAddr::from(ptr as usize).page_offset();
+            Some(pte.ppn().get_bytes_array().as_mut_ptr().wrapping_add(offset))
+        }
+    }
+}

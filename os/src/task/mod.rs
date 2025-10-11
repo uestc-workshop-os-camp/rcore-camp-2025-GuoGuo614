@@ -153,6 +153,21 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn increase_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_map.entry(syscall_id).and_modify(|v| *v += 1).or_insert(1);
+    }
+
+    fn trace_syscall(&self, syscall_id: usize) -> isize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        match inner.tasks[current].syscall_map.get(&syscall_id) {
+            Some(times) => *times as isize,
+            None => 0
+        }
+    }
 }
 
 /// Run the first task in task list.
@@ -201,4 +216,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Increase the counter for syscall
+pub fn increase_syscall(id: usize) {
+    TASK_MANAGER.increase_syscall(id);
+}
+
+/// Get the id(th) task's syscall times
+pub fn trace_syscall(id: usize) -> isize {
+    TASK_MANAGER.trace_syscall(id)
 }

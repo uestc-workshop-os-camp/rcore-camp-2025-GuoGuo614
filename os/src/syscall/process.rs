@@ -1,8 +1,13 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::task::{
+    change_program_brk, 
+    exit_current_and_run_next, 
+    suspend_current_and_run_next,
+    trace_syscall
+};
 
 use crate::task::current_user_token;
-use crate::mm::translated_byte_buffer;
+use crate::mm::{translated_byte_buffer, translated_const_ptr, translated_mut_ptr};
 use crate::timer::{get_time_ms, get_time_us};
 
 #[repr(C)]
@@ -29,22 +34,55 @@ pub fn sys_yield() -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(ts: *mut TimeVal, tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
     let token = current_user_token();
-    let buf = translated_byte_buffer(token, ts as *mut u8, core::mem::size_of::<TimeVal>());
+    let len = core::mem::size_of::<TimeVal>();
+    let buf = translated_byte_buffer(token, ts as *mut u8, len);
     let time = TimeVal {
         sec: get_time_ms() / 1000,
         usec: get_time_us() % 1_000_000
     };
-
+    let bytes = unsafe {
+        core::slice::from_raw_parts(&time as *const TimeVal as *const u8, len)
+    };
+    let mut offset = 0;
+    for seg in buf {
+        let len = seg.len().min(bytes.len() - offset);
+        seg[..len].copy_from_slice(&bytes[offset..offset + len]);
+        offset += len;
+    }
+    0
 }
 
-/// TODO: Finish sys_trace to pass testcases
+/// Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    let token = current_user_token();
+    match trace_request {
+        0 => {
+            let ptr = translated_const_ptr(token, id as *const u8);
+            match ptr {
+                None => -1,
+                Some(ptr) => unsafe {
+                    *ptr as isize
+                }
+            }
+        }
+        1 => {
+            let ptr = translated_mut_ptr(token, id as *mut u8);
+            match ptr {
+                None => -1,
+                Some(ptr) => unsafe {
+                    *ptr = data as u8;
+                    0
+                }
+            }
+        }
+        2 => { trace_syscall(id) }
+        _ => { -1 }
+    }
 }
 
 // YOUR JOB: Implement mmap.
