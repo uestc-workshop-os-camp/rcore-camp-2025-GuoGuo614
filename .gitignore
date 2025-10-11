@@ -19,3 +19,4 @@ pushall.sh
 ci-user/
 os/vendor/
 user/
+.DS_Store
