@@ -10,6 +10,8 @@ use crate::{
     },
     timer::{get_time_ms, get_time_us},
 };
+use crate::config::PAGE_SIZE;
+use crate::mm::MapPermission;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -106,7 +108,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
@@ -131,21 +133,41 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
+    trace!("kernel:pid[{}] sys_mmap", current_task().unwrap().pid.0);
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    // prot must contain at least one of R/W/X and must not contain unsupported bits
+    // Accept only bits 0..2 (R/W/X). Any other bits (e.g., 8) are invalid.
+    if (prot & 0x7) == 0 || (prot & !0x7) != 0 {
+        return -1;
+    }
+    let page_count = (len + PAGE_SIZE - 1) / PAGE_SIZE;
+    let end = start + page_count * PAGE_SIZE;
+
+    // build MapPermission from prot bits (R=bit0, W=bit1, X=bit2)
+    let mut perm = MapPermission::empty() | MapPermission::U;
+    if prot & (1 << 0) != 0 { perm |= MapPermission::R; }
+    if prot & (1 << 1) != 0 { perm |= MapPermission::W; }
+    if prot & (1 << 2) != 0 { perm |= MapPermission::X; }
+
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.insert_framed_area_checked(start.into(), end.into(), perm)
 }
 
 /// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let page_count = (len + PAGE_SIZE - 1) / PAGE_SIZE;
+    let end = start + page_count * PAGE_SIZE;
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.remove_area_with_start_end(start.into(), end.into())
 }
 
 /// change data segment size
