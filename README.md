@@ -51,3 +51,8 @@ $ git checkout ch<Number>
 $ cd ci-user
 $ make test CHAPTER=<Number>
 ```
+
+### Environments
+For Qemu10.0.0: SBI_SET_TIMER = 0x54494D45; SBI_SHUTDOWN = 0x53525354;
+For Qemu7.0.0 : SBI_SET_TIMER = 0;          SBI_SHUTDOWN = 8;
+And you should care about the version of rustsbi!!
