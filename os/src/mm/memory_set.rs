@@ -69,14 +69,14 @@ impl MemorySet {
         start_va: VirtAddr,
         end_va: VirtAddr,
         permission: MapPermission,
-    ) -> Option<isize> {
+    ) -> isize {
         for area in &self.areas {
             if area.vpn_range.overlaps(&VPNRange::new(start_va.floor(), end_va.ceil())) {
-                return None;
+                return -1;
             }
         }
         self.insert_framed_area(start_va, end_va, permission);
-        Some(0)
+        0
     }
     /// Remove an Area, check if it appears
     pub fn remove_framed_area_checked(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize {

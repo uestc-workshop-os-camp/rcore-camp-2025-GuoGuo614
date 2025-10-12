@@ -171,9 +171,9 @@ impl TaskManager {
         }
     }
 
-    fn mmap(&self, start_va: usize, len: usize, prot: usize) -> Option<isize> {
+    fn mmap(&self, start_va: usize, len: usize, prot: usize) -> isize {
         if start_va % PAGE_SIZE != 0 {
-            return None;
+            return -1;
         }
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
@@ -187,8 +187,8 @@ impl TaskManager {
 
         inner.tasks[current].memory_set.insert_framed_area_checked(start_va.into(), end_va.into(), perm)
         // match inner.tasks[current].change_program_brk((page_count * PAGE_SIZE).try_into().unwrap()) {
-        //     None => None,
-        //     Some(_) => Some(0)
+        //     None => -1,
+        //     Some(_) => 0
         // }
     }
 
@@ -200,6 +200,7 @@ impl TaskManager {
         let current = inner.current_task;
         let page_count = (len + PAGE_SIZE - 1) / PAGE_SIZE;
         let end_va = start_va + page_count * PAGE_SIZE;
+
         inner.tasks[current].memory_set.remove_framed_area_checked(start_va.into(), end_va.into())
     }
 }
@@ -263,11 +264,11 @@ pub fn trace_syscall(id: usize) -> isize {
 }
 
 /// Alloc memory and map it
-pub fn mmap(start: usize, len: usize, prot: usize) -> Option<isize> {
+pub fn mmap(start: usize, len: usize, prot: usize) -> isize {
     TASK_MANAGER.mmap(start, len, prot)
 }
 
 /// Unmap a MapArea
-pub fn munmap(start: usize, len: usize) -> isize{
+pub fn munmap(start: usize, len: usize) -> isize {
     TASK_MANAGER.munmap(start, len)
 }

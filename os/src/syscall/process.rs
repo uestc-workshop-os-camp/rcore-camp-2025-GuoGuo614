@@ -93,11 +93,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     if prot & !0x7 != 0 || prot & 0x7 == 0 {
         return -1;
     }
-    if let Some(result) = mmap(start, len, prot) {
-        result
-    } else {
-        -1
-    }
+    mmap(start, len, prot)
 }
 
 // YOUR JOB: Implement munmap.
