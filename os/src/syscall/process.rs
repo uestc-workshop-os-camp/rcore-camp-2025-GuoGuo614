@@ -190,8 +190,9 @@ pub fn sys_spawn(path: *const u8) -> isize {
 
     if let Some(data) = get_app_data_by_name(path.as_str()) {
         let new_task = current_task.spawn(data);
+        let new_pid = new_task.pid.0;
         add_task(new_task);
-        new_task.pid.0 as isize
+        new_pid as isize
     } else {
         -1
     }
