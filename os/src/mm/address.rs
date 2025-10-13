@@ -271,3 +271,9 @@ where
 }
 /// a simple range structure for virtual page number
 pub type VPNRange = SimpleRange<VirtPageNum>;
+
+impl VPNRange {
+    pub fn overlaps(&self, other: &VPNRange) -> bool {
+        self.get_start() < other.get_end() && other.get_start() < self.get_end()
+    }
+}
