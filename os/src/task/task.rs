@@ -9,7 +9,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
 
-pub const BIG_STRIDE: usize = 1_000_000;
+pub const BIG_STRIDE: usize = 10_000;
 
 /// Task control block structure
 ///
