@@ -92,7 +92,7 @@ pub fn current_user_token() -> usize {
     task.get_user_token()
 }
 
-///Get the mutable reference to trap context of current task
+/// Get the mutable reference to trap context of current task
 pub fn current_trap_cx() -> &'static mut TrapContext {
     current_task()
         .unwrap()

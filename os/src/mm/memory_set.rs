@@ -54,6 +54,27 @@ impl MemorySet {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
+    /// If va misaligned or conflicts, return -1
+    pub fn insert_framed_area_checked(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) -> isize {
+        let s: usize = start_va.into();
+        let e: usize = end_va.into();
+        if s % PAGE_SIZE != 0 || e % PAGE_SIZE != 0 || s >= e {
+            return -1;
+        }
+        let req = VPNRange::new(start_va.floor(), end_va.ceil());
+        for area in &self.areas {
+            if area.vpn_range.overlaps(&req) {
+                return -1;
+            }
+        }
+        self.insert_framed_area(start_va, end_va, permission);
+        0
+    }
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,
@@ -66,7 +87,7 @@ impl MemorySet {
             None,
         );
     }
-    /// remove a area
+    /// remove an area with start
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
             .areas
@@ -76,6 +97,20 @@ impl MemorySet {
         {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
+        }
+    }
+    /// remove an area with va
+    pub fn remove_area_with_start_end(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        if let Some((idx, area)) = self.areas.iter_mut().enumerate().find(|(_, area)| {
+            area.vpn_range.get_start() == start_vpn && area.vpn_range.get_end() == end_vpn
+        }) {
+            area.unmap(&mut self.page_table);
+            self.areas.remove(idx);
+            0
+        } else {
+            -1
         }
     }
     /// Add a new MapArea into this MemorySet.
