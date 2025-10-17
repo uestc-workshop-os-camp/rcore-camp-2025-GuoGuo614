@@ -13,6 +13,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
 use core::cell::RefMut;
 
 /// Process Control Block
@@ -49,6 +50,14 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// deadlock detect enability
+    pub deadlock_is_enbale: bool,
+    /// available resource vector
+    pub available: Vec<usize>,
+    /// allocation matrix
+    pub allocation: BTreeMap<usize, Vec<usize>>,
+    /// need matrix
+    pub need: BTreeMap<usize, Vec<usize>>,
 }
 
 impl ProcessControlBlockInner {
@@ -119,6 +128,10 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_is_enbale: false,
+                    available: Vec::new(),
+                    allocation: BTreeMap::new(),
+                    need: BTreeMap::new(),
                 })
             },
         });
@@ -245,6 +258,10 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_is_enbale: false,
+                    available: Vec::new(),
+                    allocation: BTreeMap::new(),
+                    need: BTreeMap::new(),
                 })
             },
         });
@@ -281,5 +298,67 @@ impl ProcessControlBlock {
     /// get pid
     pub fn getpid(&self) -> usize {
         self.pid.0
+    }
+    /// Deadlock detect is enable
+    pub fn deadlock_is_enbale(&self) -> bool {
+        self.inner_exclusive_access().deadlock_is_enbale
+    }
+    /// Increase Need Matrix
+    pub fn increase_need(&self, num: usize, tid: usize, lock_idx: usize) {
+        let mut inner = self.inner_exclusive_access();
+        inner.need.get_mut(&tid).unwrap()[lock_idx] += num;
+    }
+    /// Alloc values
+    pub fn alloc_values(&self, tid: usize, lock_idx: usize) {
+        let mut inner = self.inner_exclusive_access();
+        inner.allocation.get_mut(&tid).unwrap()[lock_idx] += 1;
+        inner.need.get_mut(&tid).unwrap()[lock_idx] -= 1;
+        inner.available[lock_idx] -= 1;
+    }
+    /// Dealloc values
+    pub fn dealloc_values(&self, tid: usize, lock_idx: usize) {
+        let mut inner = self.inner_exclusive_access();
+        inner.allocation.get_mut(&tid).unwrap()[lock_idx] -= 1;
+        inner.available[lock_idx] += 1;
+    }
+    /// It is safe to lock
+    pub fn deadlock_is_safe(&self, _lock_idx: usize) -> bool {
+        let process = self.inner_exclusive_access();
+        let mut work: Vec<usize> = process.available.clone();
+        let lock_num = work.len();
+        // for i in 0..lock_num {
+        //     println!("{}", work[i]);
+        // }
+        let thread_num = process.tasks.len();
+        let mut finish = vec![false; thread_num];
+
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for i in 0..thread_num {
+                if finish[i] {
+                    continue;
+                }
+                let tid = process.tasks[i].as_ref().unwrap().get_tid();
+                let mut is_legal = true;
+                for lock_idx in 0..lock_num {
+                    let need = process.need.get(&tid).unwrap()[lock_idx];
+                    // println!("thread {}'s lock {} need is {}", tid, lock_idx, need);
+                    if need > work[lock_idx] {
+                        is_legal = false;
+                        break;
+                    }
+                }
+                if is_legal {
+                    for lock_idx in 0..lock_num {
+                        work[lock_idx] = work[lock_idx] + process.allocation.get(&tid).unwrap()[lock_idx];
+                        // println!("thread {} increase lock {}'s allocation {}", tid, lock_idx, process.allocation.get(&tid).unwrap()[lock_idx]);
+                    }
+                    finish[i] = true;
+                    changed = true;
+                }
+            }
+        }
+        finish.iter().all(|&f| f)
     }
 }

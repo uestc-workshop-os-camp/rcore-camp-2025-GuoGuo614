@@ -2,6 +2,7 @@
 
 use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
+use crate::alloc::vec;
 use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
@@ -65,6 +66,13 @@ impl TaskControlBlock {
         let trap_cx_ppn = res.trap_cx_ppn();
         let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
+        let tid = res.tid;
+        let mut inner = process.inner_exclusive_access();
+        let resource_num = inner.available.len();
+        inner.allocation.insert(tid, vec![0; resource_num]);
+        inner.need.insert(tid, vec![0; resource_num]);
+        drop(inner);
+
         Self {
             process: Arc::downgrade(&process),
             kstack,
@@ -77,6 +85,17 @@ impl TaskControlBlock {
                     exit_code: None,
                 })
             },
+        }
+    }
+    /// Get task's tid
+    pub fn get_tid(&self) -> usize {
+        let inner = self.inner_exclusive_access();
+        match inner.res.as_ref() {
+            None => {
+                println!("Res is None, is there no problem?");
+                0
+            }
+            Some(res) => res.tid
         }
     }
 }
