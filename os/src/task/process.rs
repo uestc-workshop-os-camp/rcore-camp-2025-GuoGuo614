@@ -322,6 +322,7 @@ impl ProcessControlBlock {
         inner.available[lock_idx] += 1;
     }
     /// It is safe to lock
+    /// GPT remind me that argument lock_idx is unnecessary, we should control globally.
     pub fn deadlock_is_safe(&self, _lock_idx: usize) -> bool {
         let process = self.inner_exclusive_access();
         let mut work: Vec<usize> = process.available.clone();
